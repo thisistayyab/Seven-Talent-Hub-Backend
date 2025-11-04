@@ -38,13 +38,13 @@ app.use(express.static("public"))
 app.use(cookieParser())
 
 // Import routes
-import { router } from './Routes/user.routes.js';
-import { consultantRouter } from './Routes/consultant.routes.js';
-import { clientRouter } from './Routes/client.routes.js';
-import { activityRouter } from './Routes/activity.routes.js';
-import { notificationRouter } from './Routes/notification.routes.js';
-import { tagRouter } from './Routes/tag.routes.js';
-import { commercialRouter } from './Routes/commercial.routes.js';
+import { router } from './routes/user.routes.js';
+import { consultantRouter } from './routes/consultant.routes.js';
+import { clientRouter } from './routes/client.routes.js';
+import { activityRouter } from './routes/activity.routes.js';
+import { notificationRouter } from './routes/notification.routes.js';
+import { tagRouter } from './routes/tag.routes.js';
+import { commercialRouter } from './routes/commercial.routes.js';
 
 // Use routes
 app.use("/v1/api/user", router);
