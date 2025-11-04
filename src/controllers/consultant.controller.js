@@ -203,7 +203,7 @@ const updateConsultant = asyncHandler(async (req, res) => {
     updateData.english_level = consultantData.englishLevel || consultantData.english_level;
   if (consultantData.nationality !== undefined) updateData.nationality = consultantData.nationality;
   if (consultantData.age !== undefined) updateData.age = parseInt(consultantData.age) || null;
-  if (consultantData.nextFollowup !== undefined) updateData.next_followup = consultantData.nextFollowup;
+  if (consultantData.nextFollowup !== undefined) updateData.next_followup = consultantData.nextFollowup || null;
   if (consultantData.templatedCvUrl !== undefined)
     updateData.templated_cv_url = consultantData.templatedCvUrl;
   if (cvFileUrl) updateData.cv_file_url = cvFileUrl;
@@ -283,7 +283,7 @@ const updateConsultant = asyncHandler(async (req, res) => {
   }
 
   if (consultantData.blacklistDate !== undefined || consultantData.blacklist_date !== undefined) {
-    updateData.blacklist_date = consultantData.blacklistDate || consultantData.blacklist_date;
+    updateData.blacklist_date = consultantData.blacklistDate || consultantData.blacklist_date || null;
   }
 
   updateData.last_activity = new Date().toISOString();
@@ -296,6 +296,7 @@ const updateConsultant = asyncHandler(async (req, res) => {
     .single();
 
   if (error) {
+    console.log(error)
     throw new ApiError(500, `Failed to update consultant: ${error.message}`);
   }
 

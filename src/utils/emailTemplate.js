@@ -9,7 +9,7 @@ const DEFAULT_BRAND = {
 	muted: '#666666',
 };
 
-export function wrapEmail({ title = 'SevenOpportunity', contentHtml = '', logoUrl }) {
+export function wrapEmail({ title = 'Seven Talent Hub', contentHtml = '', logoUrl }) {
 	const safeLogo = logoUrl || `${process.env.FRONTEND_URL || ''}/seven.png`;
 	return `<!DOCTYPE html>
 <html lang="fr">
