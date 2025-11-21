@@ -21,3 +21,4 @@ router.route("/clear-all").delete(verifyJWT, clearAllNotifications);
 export { router as notificationRouter };
 
 
+

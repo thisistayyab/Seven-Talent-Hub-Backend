@@ -23,3 +23,4 @@ router.route("/:id").delete(verifyJWT, deleteActivity);
 export { router as activityRouter };
 
 
+

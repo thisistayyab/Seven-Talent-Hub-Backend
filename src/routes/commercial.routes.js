@@ -9,3 +9,4 @@ router.route("/").get(verifyJWT, getAllCommercials);
 export { router as commercialRouter };
 
 
+

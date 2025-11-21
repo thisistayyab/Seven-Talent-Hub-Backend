@@ -22,3 +22,4 @@ router.route("/:id").delete(verifyJWT, deleteConsultant);
 export { router as consultantRouter };
 
 
+

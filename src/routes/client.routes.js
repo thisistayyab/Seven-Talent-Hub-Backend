@@ -21,3 +21,4 @@ router.route("/:id").delete(verifyJWT, deleteClient);
 export { router as clientRouter };
 
 
+
