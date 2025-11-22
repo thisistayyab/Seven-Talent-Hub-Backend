@@ -23,6 +23,7 @@ const io = new Server(httpServer, {
         "http://127.0.0.1:3000",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
+        "https://7talenthub.vercel.app",
         /https?:\/\/.*\.vercel\.app$/,
         /https?:\/\/.*\.vercel\.app:\d+$/
       ];
@@ -86,17 +87,26 @@ app.use(cors({
             "http://127.0.0.1:3000",
             "http://localhost:4173",
             "http://127.0.0.1:4173",
-            /https?:\/\/.*\.vercel\.app$/
+            "https://7talenthub.vercel.app",
+            /https?:\/\/.*\.vercel\.app$/,
+            /https?:\/\/.*\.vercel\.app:\d+$/
         ];
         const isAllowed = allowList.some((allowed) => {
             if (allowed instanceof RegExp) return allowed.test(origin);
             return allowed === origin;
         });
-        return isAllowed ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            console.warn('CORS blocked origin:', origin);
+            callback(new Error('Not allowed by CORS'));
+        }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
+    optionsSuccessStatus: 200
 }))
 
 app.use(express.json({limit:"50mb"}))
