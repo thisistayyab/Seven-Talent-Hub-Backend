@@ -2,16 +2,17 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { supabaseAdmin } from "../utils/supabaseClient.js";
+import { redisClient } from "../utils/redisClient.js";
+import { sendMail } from "../utils/sendMail.js";
+import { wrapEmail } from "../utils/emailTemplate.js";
 import { notificationService } from "./notification.controller.js";
 
 const getAllClients = asyncHandler(async (req, res) => {
   const currentUser = req.user;
   let query = supabaseAdmin.from("clients").select("*");
 
-  // Filter for user_7options role
-  if (currentUser.role === "user_7options") {
-    query = query.or(`category.eq.seven_options,type.eq.individual`);
-  }
+  // Allow 7 options role to view all clients (including seven_opportunity)
+  // No filter needed - they can see and add both categories
 
   const { data: clients, error } = await query.order("created_at", { ascending: false });
 
@@ -40,6 +41,7 @@ const getClientById = asyncHandler(async (req, res) => {
 
 const createClient = asyncHandler(async (req, res) => {
   const clientData = req.body;
+  const currentUser = req.user;
 
   // Parse JSON fields if they're strings
   let commercials = clientData.commercials;
@@ -54,7 +56,7 @@ const createClient = asyncHandler(async (req, res) => {
   const newClient = {
     name: clientData.name,
     type: clientData.type, // 'company' or 'individual'
-    category: clientData.category || "seven_opportunity",
+    category: clientData.category || "seven_opportunity", // Allow 7 options role to choose category
     contact_person: clientData.contactPerson || clientData.contact_person || null,
     email: clientData.email || null,
     phone: clientData.phone || null,
@@ -76,12 +78,62 @@ const createClient = asyncHandler(async (req, res) => {
     throw new ApiError(500, `Failed to create client: ${error.message}`);
   }
 
+  // Ensure auth account exists for client (individual or contact email) and send invite
+  if (createdClient.email) {
+    try {
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', createdClient.email)
+        .maybeSingle();
+
+      if (!existingProfile) {
+        const role = createdClient.type === 'individual'
+          ? (createdClient.category === 'seven_options' ? 'user_7options' : 'user')
+          : 'user';
+        const tempPassword = `Tmp!${Math.random().toString(36).slice(2)}${Date.now()}`;
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: createdClient.email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: {
+            name: createdClient.name,
+            username: (createdClient.email || '').split('@')[0],
+            role,
+          },
+        });
+
+        if (!authError && authUser?.user?.id) {
+          const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+          await redisClient.setEx(`invite:${authUser.user.id}`, 60 * 60 * 24 * 7, token);
+
+          const linkBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+          const inviteUrl = `${linkBase}/set-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(createdClient.email)}`;
+          const emailHtml = wrapEmail({
+            title: 'Invitation',
+            contentHtml: `
+              <p>Bonjour ${createdClient.name || ''},</p>
+              <p>Votre accès à <strong>Seven Talent Hub</strong> a été créé.</p>
+              <p>Veuillez définir votre mot de passe pour vous connecter :</p>
+              <p><a class=\"btn\" href=\"${inviteUrl}\">Définir mon mot de passe</a></p>
+              <p class=\"small-note\">Ce lien expire dans 7 jours.</p>
+            `,
+          });
+          await sendMail({ to: createdClient.email, subject: 'Invitation Seven Talent Hub', html: emailHtml });
+        }
+      }
+    } catch (inviteErr) {
+      console.error('Client invite error:', inviteErr);
+    }
+  }
+
   res.status(201).json(new ApiResponse(201, createdClient, "Client created successfully"));
 });
 
 const updateClient = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const clientData = req.body;
+  const currentUser = req.user;
 
   // Check if client exists
   const { data: existingClient, error: fetchError } = await supabaseAdmin
@@ -117,6 +169,9 @@ const updateClient = asyncHandler(async (req, res) => {
 
   updateData.last_activity = new Date().toISOString();
 
+  // Allow 7 options role to add/view 7 opportunity clients
+  // No restriction on category
+
   const { data: updatedClient, error } = await supabaseAdmin
     .from("clients")
     .update(updateData)
@@ -126,6 +181,12 @@ const updateClient = asyncHandler(async (req, res) => {
 
   if (error) {
     throw new ApiError(500, `Failed to update client: ${error.message}`);
+  }
+
+  // Emit Socket.IO event for real-time updates
+  const io = req.app.get('io');
+  if (io && updatedClient) {
+    io.emit('client:updated', updatedClient);
   }
 
   res.status(200).json(new ApiResponse(200, updatedClient, "Client updated successfully"));
@@ -165,10 +226,8 @@ const searchClients = asyncHandler(async (req, res) => {
 
   let query = supabaseAdmin.from("clients").select("*");
 
-  // Filter for user_7options role
-  if (currentUser.role === "user_7options") {
-    query = query.or(`category.eq.seven_options,type.eq.individual`);
-  }
+  // Allow 7 options role to view all clients (including seven_opportunity)
+  // No filter needed
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,contact_person.ilike.%${search}%`);
@@ -202,5 +261,8 @@ const searchClients = asyncHandler(async (req, res) => {
 });
 
 export { getAllClients, getClientById, createClient, updateClient, deleteClient, searchClients };
+
+
+
 
 

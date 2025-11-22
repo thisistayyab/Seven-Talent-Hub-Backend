@@ -43,8 +43,14 @@ io.on('connection', (socket) => {
   // Join notification room for user
   socket.on('join:notifications', (userId) => {
     if (userId) {
-      socket.join(`notifications:${userId}`);
-      console.log(`Socket ${socket.id} joined notifications room for user ${userId}`);
+      const roomName = `notifications:${String(userId)}`;
+      socket.join(roomName);
+      console.log(`✅ Socket ${socket.id} joined notifications room: ${roomName}`);
+      
+      // Send confirmation to client
+      socket.emit('notification:room:joined', { userId: String(userId), room: roomName });
+    } else {
+      console.warn('⚠️ join:notifications called without userId');
     }
   });
 

@@ -96,6 +96,16 @@ const createActivity = asyncHandler(async (req, res) => {
     throw new ApiError(500, `Failed to create activity: ${error.message}`);
   }
 
+  // Emit Socket.IO event for real-time updates
+  const io = req.app.get('io');
+  if (io && createdActivity) {
+    console.log('📡 [Socket.IO] Emitting activity:created for ID:', createdActivity.id, 'type:', createdActivity.type, 'assignee:', createdActivity.assignee_id);
+    io.emit('activity:created', createdActivity);
+    console.log('✅ [Socket.IO] Activity:created event emitted globally to all connected clients');
+  } else {
+    console.warn('⚠️ [Socket.IO] Cannot emit activity:created - io:', !!io, 'createdActivity:', !!createdActivity);
+  }
+
   // Update last_activity for consultant/client
   if (createdActivity.consultant_id) {
     await supabaseAdmin
@@ -115,7 +125,7 @@ const createActivity = asyncHandler(async (req, res) => {
   if (createdActivity.consultant_id) {
     const { data: consultant } = await supabaseAdmin
       .from("consultants")
-      .select("commercial_id, name")
+      .select("id, commercial_id, name")
       .eq("id", createdActivity.consultant_id)
       .single();
 
@@ -125,13 +135,14 @@ const createActivity = asyncHandler(async (req, res) => {
       if (createdActivity.type === "email") notifType = "email";
 
       try {
+        const io = req.app.get('io');
         await notificationService.addNotification({
           type: notifType,
           message: `${currentUser.name} a ajouté une interaction (${createdActivity.type}) sur ${consultant.name}.`,
           entity_type: "consultant",
           entity_id: consultant.id,
           recipient_id: consultant.commercial_id,
-        });
+        }, io);
       } catch (notifError) {
         console.error("Notification error:", notifError);
       }
@@ -141,26 +152,29 @@ const createActivity = asyncHandler(async (req, res) => {
   if (createdActivity.client_id) {
     const { data: client } = await supabaseAdmin
       .from("clients")
-      .select("commercials, name")
+      .select("id, commercials, name")
       .eq("id", createdActivity.client_id)
       .single();
 
     if (client && client.commercials && Array.isArray(client.commercials)) {
-      client.commercials.forEach((comm) => {
-        if (comm.id !== currentUser.id) {
-          try {
-            notificationService.addNotification({
-              type: "comment",
-              message: `${currentUser.name} a ajouté une interaction sur le client ${client.name}.`,
-              entity_type: "client",
-              entity_id: client.id,
-              recipient_id: comm.id,
-            });
-          } catch (notifError) {
-            console.error("Notification error:", notifError);
-          }
-        }
-      });
+      await Promise.all(
+        client.commercials
+          .filter((comm) => comm.id && comm.id !== currentUser.id)
+          .map(async (comm) => {
+            try {
+              const io = req.app.get('io');
+              await notificationService.addNotification({
+                type: "comment",
+                message: `${currentUser.name} a ajouté une interaction sur le client ${client.name}.`,
+                entity_type: "client",
+                entity_id: client.id,
+                recipient_id: comm.id,
+              }, io);
+            } catch (notifError) {
+              console.error("Notification error:", notifError);
+            }
+          })
+      );
     }
   }
 
@@ -172,18 +186,21 @@ const createActivity = asyncHandler(async (req, res) => {
     const entityId = isConsultant ? createdActivity.consultant_id : createdActivity.client_id;
 
     try {
+      const io = req.app.get('io');
       await notificationService.addNotification({
         type: "todo",
         message: `${currentUser.name} vous a assigné une tâche concernant ${entityName}.`,
         entity_type: entityType,
         entity_id: entityId,
         recipient_id: createdActivity.assignee_id,
-      });
+      }, io);
     } catch (notifError) {
       console.error("Notification error:", notifError);
     }
   }
 
+  // Emit Socket.IO event for real-time updates (already done above)
+  
   res.status(201).json(new ApiResponse(201, createdActivity, "Activity created successfully"));
 });
 
@@ -219,6 +236,12 @@ const updateActivity = asyncHandler(async (req, res) => {
     throw new ApiError(500, `Failed to update activity: ${error.message}`);
   }
 
+  // Emit Socket.IO event for real-time updates
+  const io = req.app.get('io');
+  if (io && updatedActivity) {
+    io.emit('activity:updated', updatedActivity);
+  }
+
   res.status(200).json(new ApiResponse(200, updatedActivity, "Activity updated successfully"));
 });
 
@@ -243,5 +266,6 @@ export {
   getActivitiesByConsultant,
   getActivitiesByClient,
 };
+
 
 

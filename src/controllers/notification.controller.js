@@ -3,7 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { supabaseAdmin } from "../utils/supabaseClient.js";
 
-const addNotification = async (notificationData) => {
+const addNotification = async (notificationData, io = null) => {
   const newNotification = {
     type: notificationData.type,
     message: notificationData.message,
@@ -23,6 +23,34 @@ const addNotification = async (notificationData) => {
   if (error) {
     console.error("Failed to create notification:", error);
     return null;
+  }
+
+  // Emit Socket.IO event for real-time updates
+  if (io && createdNotification) {
+    const recipientId = String(createdNotification.recipient_id);
+    const roomName = `notifications:${recipientId}`;
+    
+    // Get all sockets in the room
+    const room = io.sockets.adapter.rooms.get(roomName);
+    const roomSockets = room ? Array.from(room) : [];
+    
+    // Emit to specific recipient's notification room
+    io.to(roomName).emit('notification:created', createdNotification);
+    
+    // Also emit globally (client will filter by recipient_id) - this ensures delivery even if room join is delayed
+    io.emit('notification:created', createdNotification);
+    
+    console.log(`📢 Notification emitted:`, {
+      id: createdNotification.id,
+      message: createdNotification.message,
+      recipientId: recipientId,
+      room: roomName,
+      socketsInRoom: roomSockets.length,
+      socketIds: roomSockets,
+      totalSockets: io.sockets.sockets.size
+    });
+  } else {
+    console.warn('⚠️ Cannot emit notification - io:', !!io, 'createdNotification:', !!createdNotification);
   }
 
   return createdNotification;

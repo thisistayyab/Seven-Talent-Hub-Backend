@@ -284,34 +284,32 @@ const createUser = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to create user profile");
   }
 
-  // If no password provided by admin, send invite email with setup link
-  if (!password) {
-    try {
-      const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      await redisClient.setEx(`invite:${authUser.user.id}`, 60 * 60 * 24 * 7, token); // 7 days
+  // Always send invite email with setup link (admin doesn't set password)
+  try {
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    await redisClient.setEx(`invite:${authUser.user.id}`, 60 * 60 * 24 * 7, token); // 7 days
 
-      const linkBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-      const inviteUrl = `${linkBase}/set-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+    const linkBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const inviteUrl = `${linkBase}/set-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 
-      const emailHtml = wrapEmail({
-        title: "Invitation",
-        contentHtml: `
-          <p>Bonjour ${name},</p>
-          <p>Un compte vous a été créé sur <strong>Seven Talent Hub</strong>.</p>
-          <p>Veuillez définir votre mot de passe pour accéder à la plateforme :</p>
-          <p><a class="btn" href="${inviteUrl}">Définir mon mot de passe</a></p>
-          <p class="small-note">Ce lien est valable 7 jours.</p>
-        `,
-      });
+    const emailHtml = wrapEmail({
+      title: "Invitation",
+      contentHtml: `
+        <p>Bonjour ${name},</p>
+        <p>Un compte vous a été créé sur <strong>Seven Talent Hub</strong>.</p>
+        <p>Veuillez définir votre mot de passe pour accéder à la plateforme :</p>
+        <p><a class="btn" href="${inviteUrl}">Définir mon mot de passe</a></p>
+        <p class="small-note">Ce lien est valable 7 jours.</p>
+      `,
+    });
 
-      await sendMail({
-        to: email,
-        subject: "Bienvenue sur Seven Talent Hub - Définissez votre mot de passe",
-        html: emailHtml,
-      });
-    } catch (e) {
-      console.error('Invite email error:', e);
-    }
+    await sendMail({
+      to: email,
+      subject: "Bienvenue sur Seven Talent Hub - Définissez votre mot de passe",
+      html: emailHtml,
+    });
+  } catch (e) {
+    console.error('Invite email error:', e);
   }
 
   res.status(201).json(new ApiResponse(201, newProfile, "User created successfully"));
