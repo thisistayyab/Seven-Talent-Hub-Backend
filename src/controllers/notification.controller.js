@@ -40,15 +40,6 @@ const addNotification = async (notificationData, io = null) => {
     // Also emit globally (client will filter by recipient_id) - this ensures delivery even if room join is delayed
     io.emit('notification:created', createdNotification);
     
-    console.log(`📢 Notification emitted:`, {
-      id: createdNotification.id,
-      message: createdNotification.message,
-      recipientId: recipientId,
-      room: roomName,
-      socketsInRoom: roomSockets.length,
-      socketIds: roomSockets,
-      totalSockets: io.sockets.sockets.size
-    });
   } else {
     console.warn('⚠️ Cannot emit notification - io:', !!io, 'createdNotification:', !!createdNotification);
   }

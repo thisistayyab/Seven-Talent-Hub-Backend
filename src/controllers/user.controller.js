@@ -285,12 +285,13 @@ const createUser = asyncHandler(async (req, res) => {
   }
 
   // Always send invite email with setup link (admin doesn't set password)
+  let inviteUrl = null;
   try {
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
     await redisClient.setEx(`invite:${authUser.user.id}`, 60 * 60 * 24 * 7, token); // 7 days
 
     const linkBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-    const inviteUrl = `${linkBase}/set-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+    inviteUrl = `${linkBase}/set-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 
     const emailHtml = wrapEmail({
       title: "Invitation",
@@ -312,7 +313,13 @@ const createUser = asyncHandler(async (req, res) => {
     console.error('Invite email error:', e);
   }
 
-  res.status(201).json(new ApiResponse(201, newProfile, "User created successfully"));
+  // Return user data with invite URL for admin to copy
+  const responseData = {
+    ...newProfile,
+    inviteUrl: inviteUrl, // Include the invite URL in the response
+  };
+
+  res.status(201).json(new ApiResponse(201, responseData, "User created successfully"));
 });
 
 const updateUser = asyncHandler(async (req, res) => {

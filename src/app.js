@@ -49,14 +49,11 @@ const io = new Server(httpServer, {
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-
   // Join notification room for user
   socket.on('join:notifications', (userId) => {
     if (userId) {
       const roomName = `notifications:${String(userId)}`;
       socket.join(roomName);
-      console.log(`✅ Socket ${socket.id} joined notifications room: ${roomName}`);
       
       // Send confirmation to client
       socket.emit('notification:room:joined', { userId: String(userId), room: roomName });

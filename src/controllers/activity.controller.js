@@ -99,9 +99,7 @@ const createActivity = asyncHandler(async (req, res) => {
   // Emit Socket.IO event for real-time updates
   const io = req.app.get('io');
   if (io && createdActivity) {
-    console.log('📡 [Socket.IO] Emitting activity:created for ID:', createdActivity.id, 'type:', createdActivity.type, 'assignee:', createdActivity.assignee_id);
     io.emit('activity:created', createdActivity);
-    console.log('✅ [Socket.IO] Activity:created event emitted globally to all connected clients');
   } else {
     console.warn('⚠️ [Socket.IO] Cannot emit activity:created - io:', !!io, 'createdActivity:', !!createdActivity);
   }
