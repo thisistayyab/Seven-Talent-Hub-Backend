@@ -78,54 +78,7 @@ const createClient = asyncHandler(async (req, res) => {
     throw new ApiError(500, `Failed to create client: ${error.message}`);
   }
 
-  // Ensure auth account exists for client (individual or contact email) and send invite
-  if (createdClient.email) {
-    try {
-      const { data: existingProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('email', createdClient.email)
-        .maybeSingle();
-
-      if (!existingProfile) {
-        const role = createdClient.type === 'individual'
-          ? (createdClient.category === 'seven_options' ? 'user_7options' : 'user')
-          : 'user';
-        const tempPassword = `Tmp!${Math.random().toString(36).slice(2)}${Date.now()}`;
-        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: createdClient.email,
-          password: tempPassword,
-          email_confirm: true,
-          user_metadata: {
-            name: createdClient.name,
-            username: (createdClient.email || '').split('@')[0],
-            role,
-          },
-        });
-
-        if (!authError && authUser?.user?.id) {
-          const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
-          await redisClient.setEx(`invite:${authUser.user.id}`, 60 * 60 * 24 * 7, token);
-
-          const linkBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-          const inviteUrl = `${linkBase}/set-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(createdClient.email)}`;
-          const emailHtml = wrapEmail({
-            title: 'Invitation',
-            contentHtml: `
-              <p>Bonjour ${createdClient.name || ''},</p>
-              <p>Votre accès à <strong>Seven Talent Hub</strong> a été créé.</p>
-              <p>Veuillez définir votre mot de passe pour vous connecter :</p>
-              <p><a class=\"btn\" href=\"${inviteUrl}\">Définir mon mot de passe</a></p>
-              <p class=\"small-note\">Ce lien expire dans 7 jours.</p>
-            `,
-          });
-          await sendMail({ to: createdClient.email, subject: 'Invitation Seven Talent Hub', html: emailHtml });
-        }
-      }
-    } catch (inviteErr) {
-      console.error('Client invite error:', inviteErr);
-    }
-  }
+  // Clients no longer receive automatic platform accounts; admins create users manually.
 
   // Emit Socket.IO event for real-time updates
   const io = req.app.get('io');
